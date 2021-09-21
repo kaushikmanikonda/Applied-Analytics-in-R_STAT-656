@@ -1,0 +1,247 @@
+---
+title: 'STAT656: Homework 1'
+subtitle: Analyzing Airline Flight Delays.
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+# Introduction and Data
+We will be analyzing airline flight delays.  Note 
+that this Rmd file will not knit in its current form.  It is necessary to complete some of the below items
+for it to knit successfully.
+
+## Download 
+
+The first step in this assignment will be downloading the
+flight data from the [Bureau of Transportation Statistics](https://www.transtats.bts.gov/DL_SelectFields.asp?gnoyr_VQ=FGJ&QO_fu146_anzr=b0-gvzr)
+
+Here are some instructions:
+
+* Set "Filter Year" to 2019 (so as not to include COVID-related impacts.  See project topics for looking at 2020)
+* Set "Filter Period" to January
+* Select the following fields:
+  - Month
+  - DayofMonth
+  - DayofWeek
+  - FlightDate
+  - Reporting_Airline
+  - DOT_ID_Reporting_Airline
+  - OriginAirportID
+  - OriginCityMarketID
+  - Origin
+  - OriginCityName
+  - OriginState
+  - DestAirportID
+  - DestCityMarketID
+  - Dest
+  - DestCityName
+  - DestState
+  - DepDelay
+  - DepDel15
+  - ArrDelay
+  - ArrDel15
+  - Cancelled
+  - CancellationCode
+
+* Click "Download"
+* Change the "Filter Period" to February and Click "Download"
+* Change the "Filter Period" to March and Click "Download"
+* ...
+* Change the "Filter Period" to December and Click "Download"
+
+## Uncompress and rename
+
+Now, go to wherever your operating system defaults to downloading, more than likely your 'download' directory.
+There will be 12 files .zip files there.  Uncompress each of these files and rename the resulting .csv file a new name corresponding
+to the order in which they were downloaded (and hence the month of the year).  Using 'snake-case' would probably work well here
+
+* 2019_01.csv
+* 2019_02.csv
+* ...
+* 2019_12.csv
+
+## Move the files
+
+Make a subdirectory of your R working directory (the working directory is where your .Rmd file is located) called "database".  Now,
+we want to run the following code to generate an R object that is a single flat file containing all the flights for 2019.
+
+## Let's load in some packages.  
+
+```{r loadPackages}
+if(!require(tidyverse)){install.packages('tidyverse');require(tidyverse)}
+```
+
+
+# Problem 0 (20 pts)
+
+Now, we want to take the data and make a data set. First, let's get the file names from the database directory
+
+```{r getFileNames, cache = TRUE, cache.extra = file.info('./databases')}
+paths = dir("database",pattern="2019_",full.names=TRUE)
+print(paths)
+names(paths) = basename(paths)
+```
+
+#### Answer 0.1
+What does 'basename' do here?
+### "basename" here removes all path address upto
+### and including the last path separator.
+### In other words, it removes "database/" from
+### the paths and only stores the filenames.
+
+
+## Creating the data set
+
+This next step can take a few minutes.  Let's time it! Accurately timing code is 
+extremely delicate and controversial because it depends on all the settings on your computer, what
+other programs you have running, architecture (do you have multiple cores/processors/...) 
+even how long it has been since you rebooted!  
+
+But, a simple and 
+useful way is via `proc.time', which records the computer time of your processor.  Let's read in
+each .csv file into an R data file that has all of 2019 flights. 
+
+(note: we will use 'cache = TRUE'
+so that R studio won't re-compile this section every time you knit.  It will detect any changes
+to this `chunk' and re-run if there are any.  However, it doesn't detect if there are changes in
+another chunk that affect this chunk.  For that, we need 'dependson'. In this case, a change
+to the directory database would affect 'df'.  So, we want to add 'dependson' pointed to that chunk.  Note that
+each dependson chunk must be cached as well)
+```{r createDataSet, cache = TRUE, dependson = 'getFileNames'}
+srt    = proc.time()[3]
+dfList = lapply(paths,read.csv)
+df     = do.call(rbind,dfList)
+end    = proc.time()[3]
+
+df$X = NULL #get rid of that empty column
+save(df, file="2019flights.Rdata")
+
+totalTime = end - srt #### Answer 0.2 ## Overwrite the totalTime object so that it has the correct elapsed time
+```
+
+Answer: This process took 72.64 seconds.
+```{r}
+cat('This process took ',totalTime, "seconds")
+```
+
+
+Note That using purely R code, we can report the total time as well.  This would be useful if you weren't using R markdown:
+
+```{r}
+cat('total time: ',end-srt)
+```
+## The data set
+
+Let's look at some attributes of this data set
+```{r dataSetSize}
+dataSetSize = format(object.size(df),units='MiB')
+```
+
+#### Answer 0.3
+
+The total size of the flights data set for 2019 is...
+```{r}
+cat("The total size of the flights data set for 2019 is:",dataSetSize)
+```
+
+(Use inline code as the previous answer (don't just 'hard code' the value))
+
+# Problem 1 (20 pts)
+
+Some of the flights were cancelled and hence never flew.  These are recorded via the 'cancelled' feature.
+How many total flights are there in the data set? How many were cancelled?  
+
+Additionally, there are some missing values, coded as NA, in the data set.  Generally, we would want to
+impute these missing values.  However, we will return to imputation later in the
+semester.  For now, let's remove the rows (flights) with missing values. Make a new object called flightsNotCancelled that
+have the flights that were not cancelled and have no missing values.  Make sure to use this for the rest of the assignment.  Lastly,
+how many flights do we have remaining in flightsNotCancelled?
+
+```{r problem1}
+totalNum  = nrow(df)
+cancelNum =  df %>%
+  group_by(CANCELLED)%>%#### Answer 1.1 ## Insert the correct group_by statement here
+  summarise(n = n())
+
+#I just want the integer, not the tibble:
+cancelNum = as.integer(cancelNum[2,2])
+
+flightsNotCancelled = df %>%
+  filter(CANCELLED == 0) %>% #### Answer 1.2  Insert the correct filter statement here
+  na.omit
+```
+
+
+#### Answer 1.3 
+
+__make sure you complete this answer dynamically (i.e. don't hardcode in the answer, use object names)__
+
+```{r}
+RemNa <- nrow(flightsNotCancelled) + cancelNum
+cat("The total number of flights is:", totalNum,"  The total number of cancelled flights is:",cancelNum, "The total number of flights remaining after removing NAs is",RemNa)
+```
+
+# Problem 2 (15 pts)
+
+How many flights were there for each day of the week?
+```{r problem2}
+flightsPerDay = flightsNotCancelled %>% 
+  group_by(DAY_OF_WEEK) %>% 
+  summarize(total = n())
+
+flightsPerDay
+
+ggplot(data = flightsPerDay) + geom_point(aes(x = DAY_OF_WEEK, y = total))
+#### Answer 2.1 ## Alter this plot so that the points are blue and the plot is of the proportion of flights each day instead of total
+```
+```{r problem2a}
+flightsPerDay2 <- flightsPerDay
+flightsPerDay2$total <- flightsPerDay2$total/totalNum
+ggplot(data = flightsPerDay2) + geom_point(aes(x = DAY_OF_WEEK, y = total), color= "blue")
+```
+
+# Problem 3 (20 pts)
+
+Which month has the greatest proportion of late flights?
+
+```{r problem3}
+props = flightsNotCancelled %>% 
+  mutate(delayInd = ifelse(DEP_DELAY > 0,1,0)) %>% group_by(MONTH) %>%
+  #### Answer 3.1 Fill in the missing part
+  summarize(total = n(),success = sum(delayInd),prop = mean(delayInd))
+
+props
+```
+
+
+#### Answer 3.2
+
+```{r problem3a}
+max(props$prop)
+MaxMonth <- props$MONTH[props$prop == max(props$prop)]
+MaxMonth
+cat("The month with the greatest proportion of late flights is:",MaxMonth)
+```
+
+# Problem 4 (25 pts)
+
+Which departure and arrival airport combination is associated with the worst median departure delay?  You're a bit on your own here.  Use the ideas from class and from this homework to answer this question.
+
+```{r problem4}
+WorstCombo =  df %>%
+  select(ORIGIN,DEST,DEP_DEL15, DEP_DELAY) %>%
+  group_by(ORIGIN, DEST) %>%
+  summarise(DelMed = median(DEP_DELAY, na.rm = TRUE))
+WorstCombo
+```
+
+
+#### Answer 4.1
+
+```{r problem4a}
+AirCombo <- WorstCombo[order(WorstCombo$DelMed, na.last = TRUE, decreasing = TRUE),][1,]
+cat("The worst departure/arrival airport combination in terms of median delay is", "VPS","SRQ")
+AirCombo 
+```
